@@ -137,6 +137,15 @@ export default function BibleSchool() {
               <h4>{c.title}</h4>
               <p className="course-level-tag">Level: <strong>{c.level}</strong></p>
               <p className="course-desc-text">{c.desc}</p>
+              <a
+                href={`https://wa.me/2348023670737?text=${encodeURIComponent(`Hi, I'd like to enrol in ${c.code}: ${c.title} at Salvation Series Bible School.`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary btn-block"
+                style={{ marginTop: 'auto', textAlign: 'center' }}
+              >
+                Enrol Now
+              </a>
             </div>
           ))}
         </div>
@@ -182,6 +191,7 @@ export default function BibleSchool() {
           display: flex;
           flex-direction: column;
           gap: 0.75rem;
+          justify-content: space-between;
         }
         .course-card-header {
           display: flex;

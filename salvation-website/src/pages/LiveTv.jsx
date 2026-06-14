@@ -227,23 +227,6 @@ export default function LiveTv() {
             </p>
 
             {/* How-to note for the admin */}
-            <div className="youtube-live-note">
-              <strong>🎥 OBS Setup (your current setup):</strong>
-              <ol style={{ margin: '0.6rem 0 0', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <li>In OBS → Settings → Stream → Service: <strong>Custom</strong></li>
-                <li>Server: <code>rtmp://localhost/live</code></li>
-                <li>Stream Key: <code>salvation</code> (or any word)</li>
-                <li>Click <strong>Start Streaming</strong> in OBS</li>
-                <li>In <a href="#admin">Admin → Livestream tab</a>, set URL to:<br/>
-                  <code>http://localhost:8000/live/salvation/index.m3u8</code>
-                </li>
-                <li>Toggle <strong>Live ON</strong> → Save</li>
-              </ol>
-              <p style={{ marginTop: '0.6rem', marginBottom: 0, color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                ⚠️ Requires <strong>ffmpeg</strong> installed. Run: <code>winget install ffmpeg</code>
-              </p>
-            </div>
-
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '1.5rem' }}>
               <a href="#support" className="btn btn-primary">Partner with Us</a>
               <a href="#contact" className="btn btn-outline-blue">Stay Notified</a>

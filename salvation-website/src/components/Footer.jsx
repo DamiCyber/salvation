@@ -220,7 +220,7 @@ export default function Footer() {
 
         .footer-logo { margin-bottom: 1rem; }
         .footer-logo-img {
-          height: 60px;
+          height: 110px;
           width: auto;
           object-fit: contain;
           display: block;
