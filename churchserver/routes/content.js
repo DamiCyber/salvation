@@ -61,7 +61,7 @@ router.put('/:id', adminAuth, async (req, res) => {
     const item = await Content.findByIdAndUpdate(
       req.params.id,
       update,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
     if (!item) return res.status(404).json({ error: 'Content not found.' });
     res.json(item);

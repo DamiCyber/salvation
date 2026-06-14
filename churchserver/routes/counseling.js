@@ -59,7 +59,7 @@ router.get('/', adminAuth, async (req, res) => {
 // Admin: update request status
 router.patch('/:id', adminAuth, async (req, res) => {
   try {
-    const request = await Counseling.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const request = await Counseling.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after', runValidators: true });
     if (!request) return res.status(404).json({ error: 'Request not found.' });
     res.json(request);
   } catch (err) {

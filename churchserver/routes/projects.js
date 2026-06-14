@@ -26,7 +26,7 @@ router.post('/', adminAuth, async (req, res) => {
 // Admin: update a project
 router.put('/:id', adminAuth, async (req, res) => {
   try {
-    const project = await Project.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const project = await Project.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after', runValidators: true });
     if (!project) return res.status(404).json({ error: 'Project not found.' });
     res.json(project);
   } catch (err) {

@@ -5,6 +5,7 @@ const cors       = require('cors');
 const http       = require('http');
 const { Server } = require('socket.io');
 const path       = require('path');
+const nms        = require('./mediaServer'); // RTMP → HLS transcoder
 
 const app    = express();
 const server = http.createServer(app); // wrap express with http for Socket.io
@@ -83,13 +84,18 @@ app.get('/', (_req, res) => res.json({ status: 'Salvation Series API running ✅
 
 // ─── MongoDB + Server start ───────────────────────────────────
 const PORT      = process.env.PORT      || 5000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://dami594933:salvation2024@cluster0.rocypvr.mongodb.net/?appName=Cluster0';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://dami594933:salvation2024@cluster0.rocypvr.mongodb.net/salvationDB?appName=Cluster0';
 
 mongoose
   .connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
     server.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
+    // Start RTMP/HLS media server
+    nms.run();
+    console.log('📡 RTMP server on rtmp://localhost:1935/live');
+    console.log('📺 HLS  stream at http://localhost:8000/live/<stream-key>/index.m3u8');
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err.message);

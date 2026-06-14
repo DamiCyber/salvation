@@ -26,7 +26,7 @@ router.post('/', adminAuth, async (req, res) => {
 // Admin: update an event
 router.put('/:id', adminAuth, async (req, res) => {
   try {
-    const event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const event = await Event.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after', runValidators: true });
     if (!event) return res.status(404).json({ error: 'Event not found.' });
     res.json(event);
   } catch (err) {

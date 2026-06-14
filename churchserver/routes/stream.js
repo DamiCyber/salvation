@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
 // Admin: update stream config (upsert)
 router.put('/', adminAuth, async (req, res) => {
   try {
-    const config = await Stream.findOneAndUpdate({}, req.body, { new: true, upsert: true, runValidators: true });
+    const config = await Stream.findOneAndUpdate({}, req.body, { returnDocument: 'after', upsert: true, runValidators: true });
     res.json(config);
   } catch (err) {
     res.status(400).json({ error: err.message });

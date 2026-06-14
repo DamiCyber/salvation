@@ -26,7 +26,7 @@ router.post('/', async (req, res) => {
 // Public: increment pray count
 router.patch('/:id/pray', async (req, res) => {
   try {
-    const prayer = await Prayer.findByIdAndUpdate(req.params.id, { $inc: { prayCount: 1 } }, { new: true });
+    const prayer = await Prayer.findByIdAndUpdate(req.params.id, { $inc: { prayCount: 1 } }, { returnDocument: 'after' });
     if (!prayer) return res.status(404).json({ error: 'Prayer not found.' });
     res.json(prayer);
   } catch (err) {
@@ -48,7 +48,7 @@ router.get('/all', adminAuth, async (req, res) => {
 router.patch('/:id', adminAuth, async (req, res) => {
   try {
     const { status, answer } = req.body;
-    const prayer = await Prayer.findByIdAndUpdate(req.params.id, { status, answer }, { new: true, runValidators: true });
+    const prayer = await Prayer.findByIdAndUpdate(req.params.id, { status, answer }, { returnDocument: 'after', runValidators: true });
     if (!prayer) return res.status(404).json({ error: 'Prayer not found.' });
     res.json(prayer);
   } catch (err) {

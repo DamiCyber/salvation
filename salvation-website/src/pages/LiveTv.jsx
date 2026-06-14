@@ -1,163 +1,250 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
+import Hls from 'hls.js';
 import { AppContext } from '../context/AppContext';
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+
+// ── HLS Video Player component ──────────────────────────────
+function HlsPlayer({ src, title }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !src) return;
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({ liveSyncDurationCount: 3 });
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+      return () => hls.destroy();
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Native HLS (Safari)
+      video.src = src;
+      video.play().catch(() => {});
+    }
+  }, [src]);
+
+  return (
+    <video
+      ref={videoRef}
+      controls
+      autoPlay
+      playsInline
+      title={title}
+      style={{ width: '100%', height: '100%', display: 'block', background: '#000' }}
+    />
+  );
+}
 
 export default function LiveTv() {
   const { streamState, sermons } = useContext(AppContext);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [userChatText, setUserChatText] = useState('');
+
+  // ── Chat state ────────────────────────────────────────────
+  const [messages,    setMessages]    = useState([]);
+  const [chatName,    setChatName]    = useState('');
+  const [chatText,    setChatText]    = useState('');
+  const [viewerCount, setViewerCount] = useState(0);
+  const [connected,   setConnected]   = useState(false);
+
+  const socketRef  = useRef(null);
   const chatEndRef = useRef(null);
+  const chatBoxRef = useRef(null);
 
-  // Predefined list of mock chatters & messages to cycle through during live stream
-  const mockChatters = [
-    { name: "John Adams", msg: "Amen! Praying from Chicago!" },
-    { name: "Sister Clara", msg: "Thank you Lord for your healing power. Glory to God!" },
-    { name: "Pastor James", msg: "Wonderful message. The harvest is indeed white." },
-    { name: "Mary Martinez", msg: "Please pray for my mother's health, she is in the hospital." },
-    { name: "Ezekiel K.", msg: "Lord, touch our villages. Send more workers!" },
-    { name: "Elizabeth Chen", msg: "The audio is clear. Praying from Singapore." },
-    { name: "Brother Thomas", msg: "Such a powerful word on radical obedience today." },
-    { name: "Sarah G.", msg: "My heart is breaking. I surrender my plans to Jesus tonight." },
-    { name: "Anonymous", msg: "Praise report: I was healed of knee pain last crusade!" }
-  ];
-
-  // Simulating live chat messages rolling in
+  // ── Connect Socket.io when stream is live ─────────────────
   useEffect(() => {
     if (!streamState.isLive) {
-      setChatMessages([]);
+      // Disconnect if stream goes offline
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setConnected(false);
+        setMessages([]);
+      }
       return;
     }
 
-    // Seed initial messages
-    setChatMessages([
-      { id: 'm1', name: "Evangelist Daniel", msg: "Welcome to the broadcast! Post your prayer requests in chat.", isStaff: true, time: "10:00 AM" },
-      { id: 'm2', name: "Ruth Peterson", msg: "Looking forward to the sermon!", isStaff: false, time: "10:01 AM" }
-    ]);
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+    socketRef.current = socket;
 
-    const interval = setInterval(() => {
-      const randomChat = mockChatters[Math.floor(Math.random() * mockChatters.length)];
-      const newMsg = {
-        id: 'msg-' + Date.now() + Math.random(),
-        name: randomChat.name,
-        msg: randomChat.msg,
-        isStaff: false,
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-      };
-      setChatMessages(prev => [...prev.slice(-30), newMsg]); // Keep last 30 messages
-    }, 4000); // Roll in a message every 4 seconds
+    socket.on('connect', () => setConnected(true));
+    socket.on('disconnect', () => setConnected(false));
 
-    return () => clearInterval(interval);
+    // Load chat history when joining
+    socket.on('chat_history', (history) => {
+      setMessages(history);
+    });
+
+    // Receive new messages in real time
+    socket.on('chat_message', (msg) => {
+      setMessages(prev => [...prev.slice(-49), msg]);
+    });
+
+    // Live viewer count
+    socket.on('viewer_count', (count) => setViewerCount(count));
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
   }, [streamState.isLive]);
 
-  // Scroll chat container to bottom (not the whole page)
+  // ── Scroll chat box (NOT the page) to bottom ──────────────
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const box = chatBoxRef.current;
+    if (box) {
+      box.scrollTop = box.scrollHeight;
     }
-  }, [chatMessages]);
+  }, [messages]);
 
-  const handleSendChat = (e) => {
+  // ── Send a message ─────────────────────────────────────────
+  const handleSend = (e) => {
     e.preventDefault();
-    if (!userChatText.trim()) return;
+    if (!chatText.trim() || !socketRef.current) return;
 
-    const userMsg = {
-      id: 'user-msg-' + Date.now(),
-      name: "You (Partner)",
-      msg: userChatText,
-      isStaff: false,
-      isUser: true,
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    };
+    socketRef.current.emit('chat_message', {
+      name: chatName.trim() || 'Anonymous',
+      text: chatText.trim(),
+    });
 
-    setChatMessages(prev => [...prev, userMsg]);
-    setUserChatText('');
+    setChatText('');
   };
 
   const videoSermons = sermons.filter(s => s.type === 'Video');
 
   return (
     <div className="stream-page-container animate-fade-in">
-      
-      {/* Live Stream Active Layout */}
+
+      {/* ── LIVE STREAM ACTIVE ───────────────────────────────── */}
       {streamState.isLive ? (
         <section className="live-stream-active-section">
-          
           <div className="stream-layout-grid">
-            
-            {/* Left Column: Stream Video Player */}
+
+            {/* Left: Video Player */}
             <div className="stream-player-col text-left">
               <div className="stream-player-wrapper">
-                <iframe
-                  src={streamState.streamUrl}
-                  title={streamState.streamTitle}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
+                {streamState.streamUrl.includes('.m3u8') ? (
+                  // OBS → RTMP → HLS player
+                  <HlsPlayer src={streamState.streamUrl} title={streamState.streamTitle} />
+                ) : (
+                  // YouTube / external embed
+                  <iframe
+                    src={streamState.streamUrl + (streamState.streamUrl.includes('?') ? '&' : '?') + 'autoplay=1'}
+                    title={streamState.streamTitle}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                )}
               </div>
+
               <div className="stream-under-details">
                 <div className="stream-headline-row">
                   <span className="live-indicator">🔴 LIVE</span>
                   <h3>{streamState.streamTitle}</h3>
                 </div>
                 <p className="stream-desc-txt">
-                  Join our global outreach community as we worship and study the Word of God. Submit your prayer requests directly in the chat, or click the support button to plant a seed into our outreach crusades.
+                  Join our global outreach community as we worship and study the Word. Submit prayer requests in chat or support our crusades below.
                 </p>
                 <div className="stream-actions">
                   <a href="#support" className="btn btn-primary">Support Crusades</a>
-                  <a href="#support" className="btn btn-outline-gold">Submit Prayer Need</a>
+                  <a href="#prayer-programs" className="btn btn-outline-gold">Submit Prayer Need</a>
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Live Chat Panel */}
+            {/* Right: Real-time Chat */}
             <div className="stream-chat-col card">
               <div className="chat-header">
-                <h4>Live Broadcast Chat</h4>
-                <span className="active-users-count">👥 142 watching</span>
+                <div>
+                  <h4>Live Chat</h4>
+                  <span className={`conn-dot ${connected ? 'conn-online' : 'conn-offline'}`}>
+                    {connected ? '● Connected' : '○ Connecting…'}
+                  </span>
+                </div>
+                <span className="active-users-count">👥 {viewerCount} watching</span>
               </div>
-              
-              <div className="chat-messages-container">
-                {chatMessages.map(c => (
-                  <div key={c.id} className={`chat-message-bubble ${c.isUser ? 'user-chat-bubble' : ''}`}>
-                    <span className="chat-time">{c.time}</span>
-                    <span className={`chat-author ${c.isStaff ? 'staff-author' : ''}`}>
-                      {c.name}
-                      {c.isStaff && <span className="staff-tag">Admin</span>}:
+
+              {/* Messages */}
+              <div className="chat-messages-container" ref={chatBoxRef}>
+                {messages.length === 0 && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center', marginTop: '1rem' }}>
+                    Be the first to say something!
+                  </p>
+                )}
+                {messages.map(msg => (
+                  <div key={msg.id} className="chat-message-bubble">
+                    <span className="chat-time">{msg.time}</span>
+                    <span className={`chat-author ${msg.isStaff ? 'staff-author' : ''}`}>
+                      {msg.name}
+                      {msg.isStaff && <span className="staff-tag">Admin</span>}:
                     </span>
-                    <span className="chat-content-text">{c.msg}</span>
+                    <span className="chat-content-text"> {msg.text}</span>
                   </div>
                 ))}
                 <div ref={chatEndRef} />
               </div>
 
-              <form onSubmit={handleSendChat} className="chat-input-form">
+              {/* Input */}
+              <form onSubmit={handleSend} className="chat-input-form">
                 <input
                   type="text"
-                  placeholder="Type a message or prayer..."
-                  value={userChatText}
-                  onChange={(e) => setUserChatText(e.target.value)}
-                  className="form-input chat-text-input"
-                  required
+                  placeholder="Your name (optional)"
+                  value={chatName}
+                  onChange={e => setChatName(e.target.value)}
+                  className="form-input chat-name-input"
+                  maxLength={30}
                 />
-                <button type="submit" className="btn btn-primary chat-send-btn">
-                  Send
-                </button>
+                <div className="chat-msg-row">
+                  <input
+                    type="text"
+                    placeholder="Type a message or prayer…"
+                    value={chatText}
+                    onChange={e => setChatText(e.target.value)}
+                    className="form-input chat-text-input"
+                    required
+                    maxLength={300}
+                  />
+                  <button type="submit" className="btn btn-primary chat-send-btn" disabled={!connected}>
+                    Send
+                  </button>
+                </div>
               </form>
             </div>
 
           </div>
-
         </section>
+
       ) : (
-        /* Stream Offline Layout */
+        /* ── OFFLINE LAYOUT ──────────────────────────────────── */
         <section className="live-stream-offline-section animate-fade-in text-center">
-          
+
           <div className="offline-hero card">
             <span className="material-symbols-outlined" style={{ fontSize: '3rem', color: 'var(--text-muted)', display: 'block', marginBottom: '1rem' }}>sensors_off</span>
             <h2>No Live Broadcast Right Now</h2>
-            <p className="offline-notice" style={{ maxWidth: '480px', margin: '0 auto 2rem' }}>
-              The next broadcast schedule will be announced soon. Subscribe to our newsletter or follow us on social media to be notified when we go live.
+            <p className="offline-notice" style={{ maxWidth: '480px', margin: '0 auto 1.5rem' }}>
+              The next broadcast will be announced soon. Subscribe to our newsletter or follow us on social media to be notified when we go live.
             </p>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+
+            {/* How-to note for the admin */}
+            <div className="youtube-live-note">
+              <strong>🎥 OBS Setup (your current setup):</strong>
+              <ol style={{ margin: '0.6rem 0 0', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <li>In OBS → Settings → Stream → Service: <strong>Custom</strong></li>
+                <li>Server: <code>rtmp://localhost/live</code></li>
+                <li>Stream Key: <code>salvation</code> (or any word)</li>
+                <li>Click <strong>Start Streaming</strong> in OBS</li>
+                <li>In <a href="#admin">Admin → Livestream tab</a>, set URL to:<br/>
+                  <code>http://localhost:8000/live/salvation/index.m3u8</code>
+                </li>
+                <li>Toggle <strong>Live ON</strong> → Save</li>
+              </ol>
+              <p style={{ marginTop: '0.6rem', marginBottom: 0, color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                ⚠️ Requires <strong>ffmpeg</strong> installed. Run: <code>winget install ffmpeg</code>
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '1.5rem' }}>
               <a href="#support" className="btn btn-primary">Partner with Us</a>
               <a href="#contact" className="btn btn-outline-blue">Stay Notified</a>
             </div>
@@ -166,8 +253,9 @@ export default function LiveTv() {
           {/* Archived Video Sermons */}
           <div className="archived-sermons-section text-left">
             <h3 className="section-title">Archived Video Sermons</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Missed a broadcast? Browse our library of past teachings and crusade videos on demand.</p>
-            
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+              Missed a broadcast? Browse our library of past teachings and crusade videos on demand.
+            </p>
             <div className="grid-2">
               {videoSermons.length === 0 ? (
                 <p>No video sermons in the archive yet.</p>
@@ -180,11 +268,11 @@ export default function LiveTv() {
                         title={serm.title}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
-                      ></iframe>
+                      />
                     </div>
                     <div className="archive-details" style={{ marginTop: '1rem' }}>
                       <span className="sermon-meta-info">{serm.date} • {serm.duration}</span>
-                      <h4 style={{ color: 'white', marginTop: '0.25rem' }}>{serm.title}</h4>
+                      <h4 style={{ color: 'var(--primary-blue)', marginTop: '0.25rem' }}>{serm.title}</h4>
                       <p style={{ fontSize: '0.85rem', marginTop: '0.5rem', margin: 0 }}>{serm.notes}</p>
                     </div>
                   </div>
@@ -197,15 +285,14 @@ export default function LiveTv() {
       )}
 
       <style>{`
-        .stream-page-container {
-          margin-bottom: 2rem;
-        }
-        
-        /* Active Stream Styles */
+        .stream-page-container { margin-bottom: 2rem; }
+
+        /* Active stream grid */
         .stream-layout-grid {
           display: grid;
           grid-template-columns: 2.2fr 1fr;
           gap: 2rem;
+          align-items: start;
         }
         .stream-player-wrapper {
           position: relative;
@@ -218,183 +305,132 @@ export default function LiveTv() {
         }
         .stream-player-wrapper iframe {
           position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
+          top: 0; left: 0;
+          width: 100%; height: 100%;
           border: none;
         }
-        .stream-under-details {
-          margin-top: 1.5rem;
-        }
-        .stream-headline-row {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          margin-bottom: 0.75rem;
-        }
-        .stream-headline-row h3 {
-          font-size: 1.4rem;
-          color: white;
-          margin: 0;
-        }
-        .stream-desc-txt {
-          font-size: 0.95rem;
-          color: var(--text-secondary);
-          line-height: 1.6;
-          margin-bottom: 1.5rem;
-        }
-        .stream-actions {
-          display: flex;
-          gap: 1rem;
-        }
+        .stream-under-details { margin-top: 1.5rem; }
+        .stream-headline-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+        .stream-headline-row h3 { font-size: 1.4rem; color: var(--primary-blue); margin: 0; }
+        .stream-desc-txt { font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem; }
+        .stream-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
 
-        /* Chat Styles */
+        /* Chat panel */
         .stream-chat-col {
           display: flex;
           flex-direction: column;
-          height: 550px;
+          height: 560px;
           padding: 1.25rem;
-          background-color: #0d1321;
+          background: #0d1321;
+          position: sticky;
+          top: 80px;
         }
         .chat-header {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          border-bottom: 1px solid var(--glass-border);
+          align-items: flex-start;
+          border-bottom: 1px solid rgba(255,255,255,0.08);
           padding-bottom: 0.75rem;
           margin-bottom: 0.75rem;
-          text-align: left;
         }
-        .chat-header h4 {
-          font-family: var(--font-sans);
-          font-size: 1rem;
-          color: white;
-        }
-        .active-users-count {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: var(--text-secondary);
-        }
+        .chat-header h4 { font-size: 1rem; color: white; margin: 0 0 0.2rem; }
+        .conn-dot { font-size: 0.7rem; font-weight: 600; }
+        .conn-online  { color: #4ade80; }
+        .conn-offline { color: var(--text-muted); }
+        .active-users-count { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+
         .chat-messages-container {
           flex-grow: 1;
           overflow-y: auto;
           overflow-x: hidden;
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
+          gap: 0.6rem;
           padding-right: 0.25rem;
-          text-align: left;
-          margin-bottom: 1rem;
-          scroll-behavior: smooth;
+          margin-bottom: 0.75rem;
           overscroll-behavior: contain;
         }
         .chat-message-bubble {
-          font-size: 0.85rem;
+          font-size: 0.83rem;
           line-height: 1.4;
-          background-color: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.04);
-          padding: 0.5rem 0.75rem;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.05);
+          padding: 0.45rem 0.7rem;
           border-radius: var(--border-radius-sm);
+          word-break: break-word;
         }
-        .user-chat-bubble {
-          background-color: rgba(212, 175, 55, 0.06);
-          border-color: rgba(212, 175, 55, 0.15);
-        }
-        .chat-time {
-          font-size: 0.7rem;
-          color: var(--text-muted);
-          margin-right: 0.5rem;
-        }
-        .chat-author {
-          font-weight: 700;
-          color: var(--primary-gold);
-          margin-right: 0.4rem;
-        }
-        .staff-author {
-          color: #ef4444;
-        }
+        .chat-time   { font-size: 0.68rem; color: var(--text-muted); margin-right: 0.4rem; }
+        .chat-author { font-weight: 700; color: var(--primary-gold); margin-right: 0.3rem; }
+        .staff-author { color: #ef4444; }
         .staff-tag {
-          background-color: #ef4444;
-          color: white;
-          font-size: 0.65rem;
-          padding: 0.05rem 0.25rem;
-          border-radius: 3px;
-          margin-left: 0.25rem;
-          font-weight: 700;
+          background: #ef4444; color: white;
+          font-size: 0.6rem; padding: 0.05rem 0.25rem;
+          border-radius: 3px; margin-left: 0.25rem; font-weight: 700;
         }
-        .chat-content-text {
-          color: #e5e7eb;
-        }
-        .chat-input-form {
-          display: flex;
-          gap: 0.5rem;
-        }
-        .chat-text-input {
-          padding: 0.5rem 0.75rem;
-          font-size: 0.85rem;
-        }
-        .chat-send-btn {
-          padding: 0.5rem 1rem;
-          font-size: 0.8rem;
-        }
+        .chat-content-text { color: #e5e7eb; }
 
-        /* Offline Styles */
+        .chat-input-form { display: flex; flex-direction: column; gap: 0.4rem; }
+        .chat-name-input  { padding: 0.4rem 0.7rem; font-size: 0.8rem; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #fff; }
+        .chat-name-input::placeholder { color: #64748b; }
+        .chat-msg-row  { display: flex; gap: 0.4rem; }
+        .chat-text-input { padding: 0.45rem 0.7rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #fff; }
+        .chat-text-input::placeholder { color: #64748b; }
+        .chat-send-btn { padding: 0.45rem 0.9rem; font-size: 0.8rem; flex-shrink: 0; }
+        .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Offline */
         .offline-hero {
           max-width: 700px;
           margin: 0 auto 4rem;
           padding: 4rem 2rem;
-          background: radial-gradient(circle at top, rgba(255, 255, 255, 0.03), transparent), var(--glass-bg);
         }
-        .offline-emoji {
-          font-size: 3.5rem;
-          display: block;
-          margin-bottom: 1rem;
-          color: var(--text-secondary);
-        }
-        .offline-notice {
-          font-size: 1.1rem;
-          margin-bottom: 2rem;
-        }
-        .countdown-box {
-          display: flex;
-          justify-content: center;
-          gap: 1.5rem;
-        }
-        .countdown-item {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          width: 80px;
-          background-color: var(--bg-800);
+        .youtube-live-note {
+          background: rgba(26,58,107,0.06);
           border: 1px solid var(--glass-border);
-          border-radius: var(--border-radius-sm);
-          padding: 0.75rem;
-        }
-        .count-num {
-          font-size: 1.8rem;
-          font-family: var(--font-serif);
-          font-weight: 700;
-          color: var(--primary-gold);
-          line-height: 1.2;
-        }
-        .count-label {
-          font-size: 0.75rem;
+          border-radius: 6px;
+          padding: 0.85rem 1.25rem;
+          font-size: 0.85rem;
           color: var(--text-secondary);
-          font-weight: 500;
+          max-width: 520px;
+          margin: 0 auto;
+          text-align: left;
+          line-height: 1.6;
         }
+        .youtube-live-note code {
+          background: var(--bg-800);
+          padding: 0.1rem 0.35rem;
+          border-radius: 3px;
+          font-size: 0.8rem;
+          color: var(--primary-blue);
+        }
+        .youtube-live-note a { color: var(--primary-blue); font-weight: 600; }
 
-        .video-archive-card {
-          padding: 1rem;
+        .video-archive-card { padding: 1rem; }
+        .video-iframe-wrapper {
+          position: relative;
+          padding-bottom: 56.25%;
+          height: 0;
+          border-radius: 6px;
+          overflow: hidden;
+          border: 1px solid var(--glass-border);
+        }
+        .video-iframe-wrapper iframe {
+          position: absolute;
+          top: 0; left: 0;
+          width: 100%; height: 100%;
+          border: none;
+        }
+        .sermon-meta-info {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: var(--primary-gold);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         @media (max-width: 900px) {
-          .stream-layout-grid {
-            grid-template-columns: 1fr;
-          }
-          .stream-chat-col {
-            height: 400px;
-          }
+          .stream-layout-grid { grid-template-columns: 1fr; }
+          .stream-chat-col { height: 380px; position: static; }
         }
       `}</style>
 

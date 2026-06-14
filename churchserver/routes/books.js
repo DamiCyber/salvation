@@ -83,7 +83,7 @@ router.put('/:id', adminAuth, async (req, res) => {
     }
     if (body.price !== undefined) update.price = parseFloat(body.price) || 0;
 
-    const book = await Book.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+    const book = await Book.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after', runValidators: true });
     if (!book) return res.status(404).json({ error: 'Book not found.' });
     res.json(book);
   } catch (err) {
