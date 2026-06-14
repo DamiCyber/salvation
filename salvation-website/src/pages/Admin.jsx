@@ -57,6 +57,9 @@ export default function Admin() {
   const [contentExcerpt, setContentExcerpt] = useState('');
   const [contentBody,    setContentBody]    = useState('');
   const [contentImage,   setContentImage]   = useState('');
+  const [contentUploading, setContentUploading] = useState(false);
+  const [contentImagePreview, setContentImagePreview] = useState('');
+  const contentImageRef = useRef(null);
 
   // ── Prayers ─────────────────────────────────────────────────────────────────
   const [prayerFilter,    setPrayerFilter]    = useState('Pending');
@@ -137,22 +140,33 @@ export default function Admin() {
       const fd = new FormData();
       fd.append('title',       bookTitle);
       fd.append('description', bookDesc);
-      fd.append('price',       bookPrice);
+      fd.append('price',       bookPrice || '0');
       fd.append('previewChapters', JSON.stringify(
         bookChapters.split('\n').filter(c => c.trim())
       ));
+
+      // Attach cover file if selected, otherwise send URL text
       if (coverFileRef.current?.files[0]) {
         fd.append('coverFile', coverFileRef.current.files[0]);
         setBookUploadProgress('Uploading cover image…');
       } else {
-        fd.append('coverUrl', bookCoverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400');
+        fd.append('coverUrl', bookCoverUrl ||
+          'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400');
       }
+
+      // Attach download file if selected, otherwise send URL text
       if (downloadFileRef.current?.files[0]) {
         fd.append('downloadFile', downloadFileRef.current.files[0]);
         setBookUploadProgress('Uploading book file…');
-      } else if (bookDlUrl) {
-        fd.append('downloadUrl', bookDlUrl);
+      } else {
+        fd.append('downloadUrl', bookDlUrl || '#');
       }
+
+      // Pass editing ID if updating
+      if (editingBook) {
+        fd.append('_id', editingBook._id || editingBook.id);
+      }
+
       await addOrUpdateBook(fd);
       alert('✅ Book saved successfully!');
       resetBookForm();
@@ -181,11 +195,13 @@ export default function Admin() {
       fd.append('mediaType', galleryMediaType);
 
       if (galleryFileRef.current?.files[0]) {
+        // Real file from disk — attach it with field name 'file'
         fd.append('file', galleryFileRef.current.files[0]);
-      } else if (galleryUrl) {
-        fd.append('url', galleryUrl);
+      } else if (galleryUrl.trim()) {
+        // URL fallback (YouTube embed, external image)
+        fd.append('url', galleryUrl.trim());
       } else {
-        alert('Please select a file or enter a URL.');
+        setGalleryUploadMsg('❌ Please select a file or enter a URL.');
         setGalleryUploading(false);
         return;
       }
@@ -195,7 +211,7 @@ export default function Admin() {
       resetGalleryForm();
       setTimeout(() => setGalleryUploadMsg(''), 4000);
     } catch (err) {
-      setGalleryUploadMsg('❌ Upload failed: ' + err.message);
+      setGalleryUploadMsg('❌ Failed: ' + err.message);
     } finally {
       setGalleryUploading(false);
     }
@@ -204,24 +220,43 @@ export default function Admin() {
   // ─── Content handlers ────────────────────────────────────────────────────────
   const resetContentForm = () => {
     setEditingContent(null); setContentTitle(''); setContentExcerpt('');
-    setContentBody(''); setContentImage('');
+    setContentBody(''); setContentImage(''); setContentImagePreview('');
+    if (contentImageRef.current) contentImageRef.current.value = '';
   };
   const handleEditContent = (item) => {
     setEditingContent(item); setContentTitle(item.title);
     setContentType(item.type); setContentExcerpt(item.excerpt);
     setContentBody(item.content); setContentImage(item.image);
+    setContentImagePreview(item.image || '');
+    if (contentImageRef.current) contentImageRef.current.value = '';
   };
-  const handleSaveContent = (e) => {
+  const handleSaveContent = async (e) => {
     e.preventDefault();
-    const obj = {
-      id: editingContent?.id || null,
-      title: contentTitle, type: contentType,
-      excerpt: contentExcerpt, content: contentBody,
-      image: contentImage || 'https://images.unsplash.com/photo-1509099836639-18ba1795216d?auto=format&fit=crop&q=80&w=800',
-    };
-    addOrUpdateContent(obj);
-    alert('✅ Article saved!');
-    resetContentForm();
+    setContentUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('title',   contentTitle);
+      fd.append('type',    contentType);
+      fd.append('excerpt', contentExcerpt);
+      fd.append('content', contentBody);
+
+      if (contentImageRef.current?.files[0]) {
+        fd.append('file', contentImageRef.current.files[0]);
+      } else {
+        fd.append('image', contentImage ||
+          'https://images.unsplash.com/photo-1509099836639-18ba1795216d?auto=format&fit=crop&q=80&w=800');
+      }
+
+      if (editingContent) fd.append('_id', editingContent._id || editingContent.id);
+
+      await addOrUpdateContent(fd);
+      alert('✅ Article saved!');
+      resetContentForm();
+    } catch (err) {
+      alert('❌ Error saving article: ' + err.message);
+    } finally {
+      setContentUploading(false);
+    }
   };
 
   // ─── Prayer handlers ─────────────────────────────────────────────────────────
@@ -342,21 +377,21 @@ export default function Admin() {
                 <input type="number" step="1" min="0" placeholder="0" value={bookPrice} onChange={e => setBookPrice(e.target.value)} className="form-input" required />
               </div>
               <div className="form-group">
-                <label className="form-label">Cover Image — Upload File</label>
+                <label className="form-label">Cover Image — Upload from Device</label>
                 <input type="file" accept="image/*" ref={coverFileRef} className="form-input" style={{ padding: '0.4rem' }} />
-                <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>Or paste a URL below instead</small>
+                <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>Select a JPG or PNG from your laptop or phone</small>
               </div>
               <div className="form-group">
-                <label className="form-label">Cover Image URL (if no file)</label>
+                <label className="form-label">Or Paste Cover Image URL (if no file)</label>
                 <input type="text" placeholder="https://…" value={bookCoverUrl} onChange={e => setBookCoverUrl(e.target.value)} className="form-input" />
               </div>
               <div className="form-group">
-                <label className="form-label">Book File — Upload PDF/ePub</label>
+                <label className="form-label">Book File — Upload PDF/ePub from Device</label>
                 <input type="file" accept=".pdf,.epub,.mobi" ref={downloadFileRef} className="form-input" style={{ padding: '0.4rem' }} />
-                <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>Or paste a download URL below instead</small>
+                <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>Select a PDF or ePub from your device</small>
               </div>
               <div className="form-group">
-                <label className="form-label">Download URL (if no file)</label>
+                <label className="form-label">Or Paste Download URL (if no file)</label>
                 <input type="text" placeholder="https://…" value={bookDlUrl} onChange={e => setBookDlUrl(e.target.value)} className="form-input" />
               </div>
               <div className="form-group">
@@ -414,7 +449,7 @@ export default function Admin() {
           {/* Upload form */}
           <div className="card">
             <h3>Upload Media</h3>
-            <p className="form-sub-desc">Upload photos directly or add video embed URLs (YouTube/Vimeo). Files are stored on Cloudinary.</p>
+            <p className="form-sub-desc">Add photos by URL or YouTube/Vimeo embed links for videos. They'll appear live on the site immediately.</p>
             <form onSubmit={handleGalleryUpload}>
               <div className="form-group">
                 <label className="form-label">Media Type</label>
@@ -445,20 +480,45 @@ export default function Admin() {
               </div>
               {galleryMediaType === 'photo' ? (
                 <div className="form-group">
-                  <label className="form-label">Select Photo File *</label>
-                  <input type="file" accept="image/*" ref={galleryFileRef} className="form-input" style={{ padding: '0.4rem' }} required />
-                  <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>JPG, PNG, WebP — max 100 MB</small>
+                  <label className="form-label">Upload Photo from Device *</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={galleryFileRef}
+                    className="form-input"
+                    style={{ padding: '0.4rem' }}
+                  />
+                  <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                    JPG, PNG, WebP — select from your laptop or phone
+                  </small>
                 </div>
               ) : (
                 <>
                   <div className="form-group">
-                    <label className="form-label">Upload Video File (optional)</label>
-                    <input type="file" accept="video/*" ref={galleryFileRef} className="form-input" style={{ padding: '0.4rem' }} />
+                    <label className="form-label">Upload Video from Device</label>
+                    <input
+                      type="file"
+                      accept="video/*"
+                      ref={galleryFileRef}
+                      className="form-input"
+                      style={{ padding: '0.4rem' }}
+                    />
+                    <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                      MP4, WebM — select from your device. Or paste a YouTube link below.
+                    </small>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Or Paste Embed URL (YouTube/Vimeo)</label>
-                    <input type="text" placeholder="https://www.youtube.com/embed/VIDEO_ID" value={galleryUrl} onChange={e => setGalleryUrl(e.target.value)} className="form-input" />
-                    <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>Must be the /embed/ link format.</small>
+                    <label className="form-label">Or Paste YouTube / Vimeo Embed URL</label>
+                    <input
+                      type="text"
+                      placeholder="https://www.youtube.com/embed/VIDEO_ID"
+                      value={galleryUrl}
+                      onChange={e => setGalleryUrl(e.target.value)}
+                      className="form-input"
+                    />
+                    <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                      Use the /embed/ format. Example: https://www.youtube.com/embed/abc123
+                    </small>
                   </div>
                 </>
               )}
@@ -522,19 +582,54 @@ export default function Admin() {
                 <label className="form-label">Title *</label>
                 <input type="text" placeholder="e.g. Crusade Report — Kakamega" value={contentTitle} onChange={e => setContentTitle(e.target.value)} className="form-input" required />
               </div>
-              <div className="grid-2">
-                <div className="form-group">
-                  <label className="form-label">Type</label>
-                  <select value={contentType} onChange={e => setContentType(e.target.value)} className="form-select">
-                    <option>Blog</option>
-                    <option>Devotional</option>
-                    <option>Testimony</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Feature Image URL</label>
-                  <input type="text" placeholder="https://…" value={contentImage} onChange={e => setContentImage(e.target.value)} className="form-input" />
-                </div>
+              <div className="form-group">
+                <label className="form-label">Type</label>
+                <select value={contentType} onChange={e => setContentType(e.target.value)} className="form-select">
+                  <option>Blog</option>
+                  <option>Devotional</option>
+                  <option>Testimony</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Feature Image — Upload from Device</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={contentImageRef}
+                  className="form-input"
+                  style={{ padding: '0.4rem' }}
+                  onChange={e => {
+                    const f = e.target.files[0];
+                    if (f) {
+                      setContentImagePreview(URL.createObjectURL(f));
+                      setContentImage(''); // clear URL field when file chosen
+                    } else {
+                      setContentImagePreview('');
+                    }
+                  }}
+                />
+                <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                  JPG, PNG, WebP — select from your device
+                </small>
+                {contentImagePreview && (
+                  <div style={{ marginTop: '0.6rem', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--glass-border)', maxHeight: 160 }}>
+                    <img src={contentImagePreview} alt="Preview" style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }} />
+                  </div>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Or Paste Image URL (if no file)</label>
+                <input
+                  type="text"
+                  placeholder="https://…"
+                  value={contentImage}
+                  onChange={e => {
+                    setContentImage(e.target.value);
+                    if (e.target.value) setContentImagePreview(e.target.value);
+                    else if (!contentImageRef.current?.files[0]) setContentImagePreview('');
+                  }}
+                  className="form-input"
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Excerpt / Summary *</label>
@@ -545,7 +640,9 @@ export default function Admin() {
                 <textarea placeholder="Write the full article here…" value={contentBody} onChange={e => setContentBody(e.target.value)} className="form-textarea" style={{ minHeight: 180 }} required />
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button type="submit" className="btn btn-primary">{editingContent ? 'Save Changes' : 'Publish Article'}</button>
+                <button type="submit" className="btn btn-primary" disabled={contentUploading}>
+                  {contentUploading ? 'Saving…' : editingContent ? 'Save Changes' : 'Publish Article'}
+                </button>
                 {editingContent && <button type="button" className="btn btn-outline-blue" onClick={resetContentForm}>Cancel</button>}
               </div>
             </form>

@@ -57,15 +57,6 @@ export default function Home() {
   return (
     <div className="home-page font-sans">
 
-      {/* ── LIVE BANNER ──────────────────────────────────────── */}
-      {streamState.isLive && (
-        <div className="live-top-bar">
-          <span className="live-dot">●</span>
-          <span><strong>WE ARE LIVE NOW:</strong> {streamState.streamTitle}</span>
-          <a href="#live-tv" className="btn btn-sm btn-crimson">Watch Now →</a>
-        </div>
-      )}
-
       {/* ── HERO ─────────────────────────────────────────────── */}
       <section className="jm-hero">
         <div className="jm-hero-overlay" />
@@ -138,7 +129,7 @@ export default function Home() {
       {/* ── JUST FOR YOU (offers / links) — like JM's "Just for you" ── */}
       <section className="jm-just-for-you">
         <div className="jfy-inner">
-          <div className="jfy-card jfy-card-blue" onClick={() => window.location.hash = '#bible-school'} style={{ cursor: 'pointer' }}>
+          <div className="jfy-card jfy-card-blue reveal reveal-delay-1" onClick={() => window.location.hash = '#bible-school'} style={{ cursor: 'pointer' }}>
             <span className="material-symbols-outlined jfy-icon" style={{ color: 'var(--primary-blue)' }}>menu_book</span>
             <div>
               <h4>Join Our Bible School</h4>
@@ -146,7 +137,7 @@ export default function Home() {
               <span className="jfy-link">Register Now →</span>
             </div>
           </div>
-          <div className="jfy-card jfy-card-gold" onClick={() => window.location.hash = '#support'} style={{ cursor: 'pointer' }}>
+          <div className="jfy-card jfy-card-gold reveal reveal-delay-2" onClick={() => window.location.hash = '#support'} style={{ cursor: 'pointer' }}>
             <span className="material-symbols-outlined jfy-icon" style={{ color: 'var(--primary-gold)' }}>handshake</span>
             <div>
               <h4>Become a Monthly Partner</h4>
@@ -154,7 +145,7 @@ export default function Home() {
               <span className="jfy-link">Begin Here →</span>
             </div>
           </div>
-          <div className="jfy-card jfy-card-red" onClick={() => window.location.hash = '#live-tv'} style={{ cursor: 'pointer' }}>
+          <div className="jfy-card jfy-card-red reveal reveal-delay-3" onClick={() => window.location.hash = '#live-tv'} style={{ cursor: 'pointer' }}>
             <span className="material-symbols-outlined jfy-icon" style={{ color: 'var(--primary-crimson)' }}>play_circle</span>
             <div>
               <h4>Watch & Listen</h4>
@@ -168,7 +159,7 @@ export default function Home() {
       {/* ── HOW CAN WE PRAY FOR YOU ──────────────────────────── */}
       <section className="jm-prayer-section">
         <div className="prayer-section-inner">
-          <div className="prayer-cta-col text-center">
+          <div className="prayer-cta-col text-center reveal-left">
             <span className="section-tag">INTERCESSION</span>
             <h2>How Can We Pray for You?</h2>
             <p>We know you have a lot on your mind. God is always here for you — and so are we.</p>
@@ -178,7 +169,7 @@ export default function Home() {
             </div>
           </div>
           {activePrayers.length > 0 && (
-            <div className="prayer-preview-col">
+            <div className="prayer-preview-col reveal-right">
               {activePrayers.map((pr, i) => (
                 <div key={pr._id || pr.id || i} className={`prayer-preview-card${pr.status === 'Praise Report' ? ' praise' : ''}`}>
                   <div className="pp-header">
@@ -206,7 +197,7 @@ export default function Home() {
           </div>
           <div className="grid-3">
             {latestContent.map((item, i) => (
-              <article key={item._id || item.id || i} className="content-card card" onClick={() => window.location.hash = '#updates'} style={{ cursor: 'pointer', padding: 0 }}>
+              <article key={item._id || item.id || i} className={`content-card card reveal reveal-delay-${i + 1}`} onClick={() => window.location.hash = '#updates'} style={{ cursor: 'pointer', padding: 0 }}>
                 {item.image && (
                   <div className="cc-img-wrap">
                     <img src={item.image} alt={item.title} className="cc-img" />
@@ -360,7 +351,7 @@ export default function Home() {
             </div>
             <div className="books-grid">
               {books.slice(0, 3).map((book, i) => (
-                <div key={book._id || book.id || i} className="book-tile card" onClick={() => window.location.hash = '#publications'} style={{ cursor: 'pointer', padding: 0 }}>
+                <div key={book._id || book.id || i} className={`book-tile card reveal reveal-delay-${i + 1}`} onClick={() => window.location.hash = '#publications'} style={{ cursor: 'pointer', padding: 0 }}>
                   <div className="book-tile-img-wrap">
                     <img src={book.coverUrl} alt={book.title} className="book-tile-img" />
                     <span className="book-tile-price">{book.price === 0 ? 'FREE' : `₦${book.price}`}</span>
@@ -391,7 +382,7 @@ export default function Home() {
             </div>
             <div className="events-grid">
               {events.slice(0, 4).map((evt, i) => (
-                <div key={evt._id || evt.id || i} className="event-card card">
+                <div key={evt._id || evt.id || i} className={`event-card card reveal reveal-delay-${i + 1}`}>
                   <div className="event-date-pill">{evt.date}</div>
                   <h4 className="event-title">{evt.title}</h4>
                   <p className="event-location"><span className="material-symbols-outlined" style={{fontSize:'14px',verticalAlign:'middle'}}>location_on</span> {evt.location}</p>

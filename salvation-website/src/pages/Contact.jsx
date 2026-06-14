@@ -69,7 +69,7 @@ export default function Contact() {
       <div className="grid-2 contact-grid">
         
         {/* Left Column: Contact Details */}
-        <div className="contact-info-col text-left">
+        <div className="contact-info-col text-left reveal-left">
           
           <div className="info-card card">
             <h3 className="column-title">Ministry Headquarters</h3>
@@ -125,7 +125,7 @@ export default function Contact() {
         </div>
 
         {/* Right Column: Contact Form */}
-        <div className="contact-form-col">
+        <div className="contact-form-col reveal-right">
           <div className="card form-wrapper-card">
             {submitted ? (
               <div className="submission-success text-center animate-fade-in">

@@ -23,7 +23,7 @@ export default function Gallery() {
       </section>
 
       {/* Category Filter Bar */}
-      <section className="category-filter-section">
+      <section className="category-filter-section reveal">
         <div className="photo-category-bar">
           {categories.map(cat => (
             <button
@@ -38,17 +38,17 @@ export default function Gallery() {
       </section>
 
       {/* Photos Grid */}
-      <section className="photos-grid-section">
+      <section className="photos-grid-section reveal">
         {filteredPhotos.length === 0 ? (
           <div className="card text-center" style={{ padding: '3rem' }}>
             <p>No photos uploaded in this category yet. Log in as admin to upload.</p>
           </div>
         ) : (
           <div className="grid-4 gallery-photos-grid">
-            {filteredPhotos.map(photo => (
+            {filteredPhotos.map((photo, idx) => (
               <div 
                 key={photo.id} 
-                className="gallery-photo-item card" 
+                className={`gallery-photo-item card reveal-zoom${idx < 4 ? ` reveal-delay-${idx + 1}` : ''}`}
                 onClick={() => setLightboxImage(photo)}
               >
                 <img src={photo.url} alt={photo.title} className="gallery-thumbnail" />

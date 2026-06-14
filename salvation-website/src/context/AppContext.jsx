@@ -178,19 +178,27 @@ export const AppProvider = ({ children }) => {
   };
 
   // ── Books ────────────────────────────────────────────────────────────────────
-  const addOrUpdateBook = async (book) => {
+  const addOrUpdateBook = async (bookData) => {
     try {
-      if (book._id || (book.id && !book.id.startsWith('book-seed'))) {
-        const id = book._id || book.id;
-        const res = await api.updateBook(id, book);
-        setBooks(prev => prev.map(b => (b._id === id || b.id === id) ? norm(res.data) : b));
+      const isForm = bookData instanceof FormData;
+      const getId  = isForm ? bookData.get('_id') || bookData.get('id') : (bookData._id || bookData.id);
+      const isSeed = !getId || String(getId).startsWith('book-seed');
+
+      if (!isSeed) {
+        const res = await api.updateBook(getId, bookData);
+        setBooks(prev => prev.map(b => (b._id === getId || b.id === getId) ? norm(res.data) : b));
       } else {
-        const res = await api.createBook(book);
+        if (isForm) { bookData.delete('_id'); bookData.delete('id'); }
+        const res = await api.createBook(bookData);
         setBooks(prev => [norm(res.data), ...prev]);
       }
     } catch (err) { console.error('Book save error:', err.message); throw err; }
   };
   const deleteBook = async (id) => {
+    if (!id || String(id).startsWith('book-seed')) {
+      setBooks(prev => prev.filter(b => b._id !== id && b.id !== id));
+      return;
+    }
     try { await api.deleteBook(id); setBooks(prev => prev.filter(b => b._id !== id && b.id !== id)); }
     catch (err) { console.error('Book delete error:', err.message); throw err; }
   };
@@ -198,33 +206,59 @@ export const AppProvider = ({ children }) => {
   // ── Content ──────────────────────────────────────────────────────────────────
   const addOrUpdateContent = async (item) => {
     try {
-      if (item._id || (item.id && !item.id.startsWith('content-seed'))) {
-        const id = item._id || item.id;
+      const isForm = item instanceof FormData;
+      const id = isForm
+        ? (item.get('_id') || item.get('id'))
+        : (item._id || item.id);
+      const isSeed = !id || String(id).startsWith('content-seed');
+
+      if (!isSeed) {
         const res = await api.updateContent(id, item);
         setContent(prev => prev.map(c => (c._id === id || c.id === id) ? norm(res.data) : c));
       } else {
+        // Strip any seed id before sending so MongoDB gets a clean create
+        if (isForm) { item.delete('_id'); item.delete('id'); }
         const res = await api.createContent(item);
         setContent(prev => [norm(res.data), ...prev]);
       }
     } catch (err) { console.error('Content save error:', err.message); throw err; }
   };
   const deleteContent = async (id) => {
+    // If it's a seed item, just remove it from local state — no API call
+    if (!id || String(id).startsWith('content-seed')) {
+      setContent(prev => prev.filter(c => c._id !== id && c.id !== id));
+      return;
+    }
     try { await api.deleteContent(id); setContent(prev => prev.filter(c => c._id !== id && c.id !== id)); }
     catch (err) { console.error('Content delete error:', err.message); throw err; }
   };
 
   // ── Gallery ──────────────────────────────────────────────────────────────────
-  const addMediaItem = async (item, mediaType) => {
+  const addMediaItem = async (itemData, mediaType) => {
     try {
-      const res = await api.addGalleryItem({ ...item, mediaType });
+      // itemData can be FormData (file) or plain object (URL-only)
+      const fd = itemData instanceof FormData ? itemData : (() => {
+        const f = new FormData();
+        Object.entries(itemData).forEach(([k, v]) => f.append(k, v));
+        return f;
+      })();
+      const res = await api.addGalleryItem(fd);
       const newItem = norm(res.data);
+      const mt = newItem.mediaType || mediaType;
       setGallery(prev => ({
-        photos: mediaType === 'photo' ? [newItem, ...prev.photos] : prev.photos,
-        videos: mediaType === 'video' ? [newItem, ...prev.videos] : prev.videos,
+        photos: mt === 'photo' ? [newItem, ...prev.photos] : prev.photos,
+        videos: mt === 'video' ? [newItem, ...prev.videos] : prev.videos,
       }));
     } catch (err) { console.error('Gallery add error:', err.message); throw err; }
   };
   const deleteMediaItem = async (id, mediaType) => {
+    if (!id || String(id).startsWith('p-seed') || String(id).startsWith('v-seed')) {
+      setGallery(prev => ({
+        photos: mediaType === 'photo' ? prev.photos.filter(p => p._id !== id && p.id !== id) : prev.photos,
+        videos: mediaType === 'video' ? prev.videos.filter(v => v._id !== id && v.id !== id) : prev.videos,
+      }));
+      return;
+    }
     try {
       await api.deleteGalleryItem(id);
       setGallery(prev => ({
@@ -290,17 +324,23 @@ export const AppProvider = ({ children }) => {
   // ── Projects ─────────────────────────────────────────────────────────────────
   const addOrUpdateProject = async (proj) => {
     try {
-      if (proj._id || (proj.id && !proj.id.startsWith('proj-seed'))) {
-        const id = proj._id || proj.id;
+      const id = proj._id || proj.id;
+      const isSeed = !id || String(id).startsWith('proj-seed');
+      if (!isSeed) {
         const res = await api.updateProject(id, proj);
         setProjects(prev => prev.map(p => (p._id === id || p.id === id) ? norm(res.data) : p));
       } else {
-        const res = await api.createProject(proj);
+        const { _id, id: _id2, ...clean } = proj;
+        const res = await api.createProject(clean);
         setProjects(prev => [...prev, norm(res.data)]);
       }
     } catch (err) { console.error('Project save error:', err.message); throw err; }
   };
   const deleteProject = async (id) => {
+    if (!id || String(id).startsWith('proj-seed')) {
+      setProjects(prev => prev.filter(p => p._id !== id && p.id !== id));
+      return;
+    }
     try { await api.deleteProject(id); setProjects(prev => prev.filter(p => p._id !== id && p.id !== id)); }
     catch (err) { console.error('Project delete error:', err.message); throw err; }
   };
@@ -308,17 +348,23 @@ export const AppProvider = ({ children }) => {
   // ── Events ───────────────────────────────────────────────────────────────────
   const addOrUpdateEvent = async (evt) => {
     try {
-      if (evt._id || (evt.id && !evt.id.startsWith('ev-seed'))) {
-        const id = evt._id || evt.id;
+      const id = evt._id || evt.id;
+      const isSeed = !id || String(id).startsWith('ev-seed');
+      if (!isSeed) {
         const res = await api.updateEvent(id, evt);
         setEvents(prev => prev.map(e => (e._id === id || e.id === id) ? norm(res.data) : e));
       } else {
-        const res = await api.createEvent(evt);
+        const { _id, id: _id2, ...clean } = evt;
+        const res = await api.createEvent(clean);
         setEvents(prev => [...prev, norm(res.data)]);
       }
     } catch (err) { console.error('Event save error:', err.message); throw err; }
   };
   const deleteEvent = async (id) => {
+    if (!id || String(id).startsWith('ev-seed')) {
+      setEvents(prev => prev.filter(e => e._id !== id && e.id !== id));
+      return;
+    }
     try { await api.deleteEvent(id); setEvents(prev => prev.filter(e => e._id !== id && e.id !== id)); }
     catch (err) { console.error('Event delete error:', err.message); throw err; }
   };

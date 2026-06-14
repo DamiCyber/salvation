@@ -7,6 +7,7 @@ export default function Counseling() {
   const [counselorPhone, setCounselorPhone] = useState('');
   const [counselTopic, setCounselTopic] = useState('Salvation & Faith Foundations');
   const [counselDate, setCounselDate] = useState('');
+  const [counselDescription, setCounselDescription] = useState('');
   const [bookedStatus, setBookedStatus] = useState(false);
 
   const scripturalReferences = [
@@ -24,6 +25,7 @@ export default function Counseling() {
           email: counselorEmail,
           phone: counselorPhone,
           topic: counselTopic,
+          description: counselDescription,
           message: `Preferred date: ${counselDate}`,
         });
       } catch (err) {
@@ -34,6 +36,7 @@ export default function Counseling() {
       setCounselorEmail('');
       setCounselorPhone('');
       setCounselDate('');
+      setCounselDescription('');
       setTimeout(() => setBookedStatus(false), 5000);
     }
   };
@@ -129,6 +132,8 @@ export default function Counseling() {
                 <textarea
                   placeholder="Share details you are comfortable with to help the pastor prepare..."
                   className="form-textarea"
+                  value={counselDescription}
+                  onChange={e => setCounselDescription(e.target.value)}
                 ></textarea>
               </div>
 

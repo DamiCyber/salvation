@@ -48,10 +48,10 @@ export default function LiveTv() {
     return () => clearInterval(interval);
   }, [streamState.isLive]);
 
-  // Scroll to bottom of chat
+  // Scroll chat container to bottom (not the whole page)
   useEffect(() => {
     if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [chatMessages]);
 
@@ -279,12 +279,15 @@ export default function LiveTv() {
         .chat-messages-container {
           flex-grow: 1;
           overflow-y: auto;
+          overflow-x: hidden;
           display: flex;
           flex-direction: column;
           gap: 0.75rem;
           padding-right: 0.25rem;
           text-align: left;
           margin-bottom: 1rem;
+          scroll-behavior: smooth;
+          overscroll-behavior: contain;
         }
         .chat-message-bubble {
           font-size: 0.85rem;

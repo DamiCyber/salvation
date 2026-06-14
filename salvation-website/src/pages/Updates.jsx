@@ -29,7 +29,7 @@ export default function Updates() {
       </section>
 
       {/* Search & Category Filter Section */}
-      <section className="filter-bar card">
+      <section className="filter-bar card reveal">
         <div className="filter-controls">
           <div className="category-tabs">
             {['All', 'Blog', 'Devotional', 'Testimony'].map(type => (
@@ -56,7 +56,7 @@ export default function Updates() {
 
       {/* Featured Article (only show if no search query & on 'All' or matching category) */}
       {!searchQuery && (filterType === 'All' || featuredArticle?.type === filterType) && featuredArticle && (
-        <section className="featured-article-section card animate-fade-in" onClick={() => setSelectedArticle(featuredArticle)}>
+        <section className="featured-article-section card animate-fade-in reveal" onClick={() => setSelectedArticle(featuredArticle)}>
           <div className="grid-2 featured-grid">
             <div className="featured-img-wrapper">
               <img src={featuredArticle.image} alt={featuredArticle.title} className="featured-img" />
@@ -88,7 +88,7 @@ export default function Updates() {
             {filteredContent
               .filter(item => searchQuery || filterType !== 'All' || item.id !== featuredArticle?.id) // Exclude featured if in default list
               .map(item => (
-                <article key={item.id} className="card article-card text-left" onClick={() => setSelectedArticle(item)}>
+                <article key={item.id} className={`card article-card text-left reveal${filteredContent.indexOf(item) < 3 ? ` reveal-delay-${filteredContent.indexOf(item) + 1}` : ''}`} onClick={() => setSelectedArticle(item)}>
                   <div className="article-img-box">
                     <img src={item.image} alt={item.title} className="article-img" />
                     <span className="badge badge-info article-badge">{item.type}</span>

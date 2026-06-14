@@ -1,19 +1,38 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { AppContext } from '../context/AppContext';
 import { submitVolunteer } from '../api/index';
+import client from '../api/client';
+
+const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
+
+function usePaystackScript() {
+  const [ready, setReady] = useState(!!window.PaystackPop);
+  useEffect(() => {
+    if (window.PaystackPop) { setReady(true); return; }
+    const s = document.createElement('script');
+    s.src = 'https://js.paystack.co/v1/inline.js';
+    s.onload = () => setReady(true);
+    document.head.appendChild(s);
+  }, []);
+  return ready;
+}
 
 export default function Support() {
   const { donations, receiveDonation, prayers, submitPrayerRequest, incrementPrayCount } = useContext(AppContext);
+  const paystackReady = usePaystackScript();
 
   // Donation Form States
-  const [donateAmount, setDonateAmount] = useState('50');
-  const [customAmount, setCustomAmount] = useState('');
-  const [donorName, setDonorName] = useState('');
-  const [campaign, setCampaign] = useState('General Support');
-  const [isMonthly, setIsMonthly] = useState(false);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [generatedReceipt, setGeneratedReceipt] = useState(null);
+  const [donateAmount,      setDonateAmount]      = useState('5000');
+  const [customAmount,      setCustomAmount]      = useState('');
+  const [donorName,         setDonorName]         = useState('');
+  const [donorEmail,        setDonorEmail]        = useState('');
+  const [campaign,          setCampaign]          = useState('General Support');
+  const [isMonthly,         setIsMonthly]         = useState(false);
+  const [paymentModalOpen,  setPaymentModalOpen]  = useState(false);
+  const [paymentSuccess,    setPaymentSuccess]    = useState(false);
+  const [generatedReceipt,  setGeneratedReceipt]  = useState(null);
+  const [payError,          setPayError]          = useState('');
+  const [verifying,         setVerifying]         = useState(false);
 
   // Prayer Form States
   const [prayerName, setPrayerName] = useState('');
@@ -29,37 +48,81 @@ export default function Support() {
   // Constants
   const preSelectedAmounts = ['1000', '2000', '5000', '10000', '20000'];
 
-  // Handle Donation Submission
+  // Open checkout modal
   const triggerPaymentSimulation = (e) => {
     e.preventDefault();
+    setPayError('');
+    setPaymentSuccess(false);
+    setGeneratedReceipt(null);
     setPaymentModalOpen(true);
   };
 
-  const confirmMockPayment = () => {
+  // Launch Paystack popup
+  const handlePaystackPay = (e) => {
+    e.preventDefault();
     const finalAmount = donateAmount === 'custom' ? parseFloat(customAmount) : parseFloat(donateAmount);
-    if (!finalAmount || finalAmount <= 0) return;
+    if (!finalAmount || finalAmount <= 0) { setPayError('Please enter a valid amount.'); return; }
+    if (!donorEmail.trim()) { setPayError('Email address is required for payment.'); return; }
+    if (!paystackReady) { setPayError('Payment system is loading, please wait…'); return; }
+    if (!PAYSTACK_PUBLIC_KEY || PAYSTACK_PUBLIC_KEY.includes('xxxxx')) {
+      setPayError('Paystack is not configured yet. Add VITE_PAYSTACK_PUBLIC_KEY to your .env file.');
+      return;
+    }
+    setPayError('');
 
-    // Receive the donation in the App Context
-    receiveDonation(donorName || "Anonymous Partner", finalAmount, campaign);
+    const handler = window.PaystackPop.setup({
+      key:      PAYSTACK_PUBLIC_KEY,
+      email:    donorEmail,
+      amount:   finalAmount * 100, // kobo
+      currency: 'NGN',
+      ref:      'SSWO-DON-' + Date.now(),
+      metadata: {
+        custom_fields: [
+          { display_name: 'Donor Name',  variable_name: 'donor_name', value: donorName || 'Anonymous' },
+          { display_name: 'Campaign',    variable_name: 'campaign',   value: campaign },
+          { display_name: 'Giving Type', variable_name: 'type',       value: isMonthly ? 'Monthly' : 'One-Time' },
+        ],
+      },
+      callback: async (response) => {
+        setVerifying(true);
+        try {
+          // Verify server-side
+          const res = await client.post('/paystack/verify-donation', {
+            reference: response.reference,
+          });
+          const { amountPaid, reference, paidAt } = res.data;
 
-    // Create Receipt
-    const receiptNum = 'REC-' + Math.floor(100000 + Math.random() * 900000);
-    setGeneratedReceipt({
-      receiptNumber: receiptNum,
-      date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      amount: finalAmount,
-      name: donorName || "Anonymous Partner",
-      campaign,
-      type: isMonthly ? 'Monthly Partnership' : 'One-Time Giving'
+          receiveDonation(donorName || 'Anonymous Partner', amountPaid, campaign);
+
+          setGeneratedReceipt({
+            receiptNumber: reference,
+            date: paidAt
+              ? new Date(paidAt).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : new Date().toLocaleString(),
+            amount:   amountPaid,
+            name:     donorName || 'Anonymous Partner',
+            campaign,
+            type:     isMonthly ? 'Monthly Partnership' : 'One-Time Giving',
+          });
+          setPaymentSuccess(true);
+
+          // Reset form
+          setDonorName(''); setDonorEmail(''); setCustomAmount('');
+          setDonateAmount('5000'); setIsMonthly(false);
+        } catch (err) {
+          setPayError(
+            'Payment received but verification failed: ' +
+            (err.response?.data?.error || err.message) +
+            '. Please contact support with ref: ' + response.reference
+          );
+        } finally {
+          setVerifying(false);
+        }
+      },
+      onClose: () => { /* user dismissed popup */ },
     });
 
-    setPaymentSuccess(true);
-    
-    // Reset form
-    setDonorName('');
-    setCustomAmount('');
-    setDonateAmount('50');
-    setIsMonthly(false);
+    handler.openIframe();
   };
 
   // Close payment modal
@@ -67,6 +130,7 @@ export default function Support() {
     setPaymentModalOpen(false);
     setPaymentSuccess(false);
     setGeneratedReceipt(null);
+    setPayError('');
   };
 
   // Handle Prayer Submission
@@ -113,7 +177,7 @@ export default function Support() {
       </section>
 
       {/* Donation Goal Tracking Progress Bar */}
-      <section className="goal-tracking-section card text-center">
+      <section className="goal-tracking-section card text-center reveal">
         <div className="goal-info-row">
           <div>
             <span className="goal-label">MOCK CAMPAIGN GOAL</span>
@@ -141,7 +205,7 @@ export default function Support() {
       <section className="grid-2 support-main-grid">
         
         {/* Donation Form Card */}
-        <div className="card donation-form-card text-left">
+        <div className="card donation-form-card text-left reveal-left">
           <h3>Sow a Seed into the Harvest</h3>
           <p className="form-sub-desc">Select an amount or input a custom donation to fund crusades, water wells, and Bibles.</p>
           
@@ -196,6 +260,18 @@ export default function Support() {
             </div>
 
             <div className="form-group">
+              <label className="form-label">Email Address * <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(required for payment)</span></label>
+              <input
+                type="email"
+                placeholder="you@example.com"
+                value={donorEmail}
+                onChange={(e) => setDonorEmail(e.target.value)}
+                className="form-input"
+                required
+              />
+            </div>
+
+            <div className="form-group">
               <label className="form-label">Designate Funds Campaign</label>
               <select
                 value={campaign}
@@ -225,18 +301,18 @@ export default function Support() {
 
             {/* Donation Explanation Note */}
             <div className="donation-terms-note">
-              <p>🔒 100% of designated funds go directly to local missionary projects. Transactions are mock-simulated in this sandbox catalog environment.</p>
+              <p>🔒 Secured by Paystack — Card, Bank Transfer & USSD accepted. 100% of designated funds go directly to missionary projects.</p>
             </div>
 
             <button type="submit" className="btn btn-primary btn-block">
-              Donate Now
+              Donate Now via Paystack
             </button>
 
           </form>
         </div>
 
         {/* Volunteer/Get Involved & Mission Trip Card */}
-        <div className="card volunteer-form-card text-left">
+        <div className="card volunteer-form-card text-left reveal-right">
           <h3>Get Involved: Join the Team</h3>
           <p className="form-sub-desc">Fill out this form to volunteer, sponsor campaigns, or advocate for our mission field work.</p>
           
@@ -392,91 +468,93 @@ export default function Support() {
         </div>
       </section>
 
-      {/* Simulated Payment Gateway Overlay Modal */}
+      {/* Paystack Payment Modal */}
       {paymentModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content payment-modal-content">
             <button className="modal-close" onClick={closePaymentModal}>✕</button>
 
-            {!paymentSuccess ? (
-              <div className="payment-simulation text-center">
-                <span className="payment-icon">💳</span>
-                <h3>Secure Payment Gateway Simulation</h3>
-                <p style={{ fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                  Simulating transaction of <strong>₦{donateAmount === 'custom' ? customAmount : donateAmount}</strong> for <em>{campaign}</em>.
-                </p>
-
-                <div className="mock-card-form text-left">
-                  <div className="form-group">
-                    <label className="form-label">Cardholder Name</label>
-                    <input type="text" value={donorName || 'John Doe'} className="form-input" disabled />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Card Number</label>
-                    <input type="text" value="••••  ••••  ••••  4242" className="form-input" disabled />
-                  </div>
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label className="form-label">Expiry</label>
-                      <input type="text" value="12 / 28" className="form-input" disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">CVV</label>
-                      <input type="text" value="***" className="form-input" disabled />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="payment-modal-actions">
-                  <button className="btn btn-secondary" onClick={closePaymentModal}>Cancel</button>
-                  <button className="btn btn-primary" onClick={confirmMockPayment}>
-                    Process Mock Charge
-                  </button>
-                </div>
+            {verifying ? (
+              <div className="text-center" style={{ padding: '3rem 1rem' }}>
+                <div className="spinner" />
+                <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>Verifying your payment…</p>
               </div>
+
+            ) : !paymentSuccess ? (
+              <div className="payment-simulation">
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                  <span style={{ fontSize: '2.5rem' }}>�</span>
+                  <h3 style={{ margin: '0.5rem 0 0.25rem' }}>Complete Your Donation</h3>
+                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    <strong style={{ color: 'var(--primary-gold)' }}>
+                      ₦{(donateAmount === 'custom' ? parseFloat(customAmount || 0) : parseFloat(donateAmount)).toLocaleString()}
+                    </strong> — {campaign}
+                  </p>
+                </div>
+
+                <form onSubmit={handlePaystackPay}>
+                  <div className="form-group">
+                    <label className="form-label">Your Name</label>
+                    <input type="text" value={donorName} onChange={e => setDonorName(e.target.value)} placeholder="Anonymous Partner" className="form-input" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email Address *</label>
+                    <input type="email" value={donorEmail} onChange={e => setDonorEmail(e.target.value)} placeholder="you@example.com" className="form-input" required />
+                  </div>
+
+                  {payError && (
+                    <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.3)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: 6, fontSize: '0.85rem', marginBottom: '1rem' }}>
+                      ⚠️ {payError}
+                    </div>
+                  )}
+
+                  <div className="donation-terms-note" style={{ marginBottom: '1.25rem' }}>
+                    <p>🔒 Secured by Paystack — Card, Bank Transfer & USSD accepted</p>
+                  </div>
+
+                  <div className="payment-modal-actions">
+                    <button type="button" className="btn btn-secondary" onClick={closePaymentModal}>Cancel</button>
+                    <button type="submit" className="btn btn-primary" disabled={!paystackReady}>
+                      {paystackReady
+                        ? `Pay ₦${(donateAmount === 'custom' ? parseFloat(customAmount || 0) : parseFloat(donateAmount)).toLocaleString()}`
+                        : 'Loading…'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
             ) : (
               <div className="payment-receipt-view text-center animate-fade-in">
                 <span className="success-checkmark">✅</span>
                 <h3 className="success-title">Donation Successful!</h3>
                 <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                  Thank you for your generous gift. Your contribution immediately updates our global campaign metrics.
+                  Thank you for your generous gift. Your contribution is making an eternal impact.
                 </p>
 
-                {/* Printable Receipt Card */}
                 {generatedReceipt && (
                   <div className="receipt-card text-left">
                     <div className="receipt-header text-center">
-                      <h4>Salvation & Outreach Ministries</h4>
+                      <h4>Salvation Series World Outreach</h4>
                       <p className="receipt-sub">Official Charitable Contribution Receipt</p>
                     </div>
                     <div className="receipt-details">
-                      <div className="receipt-row">
-                        <span>Receipt No:</span>
-                        <strong>{generatedReceipt.receiptNumber}</strong>
-                      </div>
-                      <div className="receipt-row">
-                        <span>Date & Time:</span>
-                        <span>{generatedReceipt.date}</span>
-                      </div>
-                      <div className="receipt-row">
-                        <span>Donor Name:</span>
-                        <span>{generatedReceipt.name}</span>
-                      </div>
-                      <div className="receipt-row">
-                        <span>Designation:</span>
-                        <span>{generatedReceipt.campaign}</span>
-                      </div>
-                      <div className="receipt-row">
-                        <span>Type:</span>
-                        <span>{generatedReceipt.type}</span>
-                      </div>
+                      {[
+                        ['Receipt Ref',  generatedReceipt.receiptNumber],
+                        ['Date',         generatedReceipt.date],
+                        ['Donor Name',   generatedReceipt.name],
+                        ['Designation',  generatedReceipt.campaign],
+                        ['Giving Type',  generatedReceipt.type],
+                      ].map(([label, val]) => (
+                        <div key={label} className="receipt-row">
+                          <span>{label}:</span><span>{val}</span>
+                        </div>
+                      ))}
                       <div className="receipt-total-row">
                         <span>Amount Paid:</span>
                         <strong className="receipt-amt-big">₦{generatedReceipt.amount.toLocaleString()}</strong>
                       </div>
                     </div>
                     <div className="receipt-footer text-center">
-                      <p>Salvation Ministries is a simulated 501(c)(3) tax-exempt organization.</p>
                       <p>Thank you for making an impact on the mission field!</p>
                     </div>
                   </div>
@@ -776,6 +854,10 @@ export default function Support() {
           gap: 1.25rem;
         }
         
+        /* Spinner */
+        .spinner { width: 40px; height: 40px; border: 4px solid var(--glass-border); border-top-color: var(--primary-blue); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         .success-checkmark {
           font-size: 4rem;
           display: block;

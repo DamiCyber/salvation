@@ -46,7 +46,7 @@ export default function About() {
       <div className="about-body">
 
         {/* ── BIO SECTION — Joyce Meyer style ───────────────────── */}
-        <section className="bio-section">
+        <section className="bio-section reveal">
           <div className="bio-image-col">
             <div className="bio-img-wrapper">
               <img
@@ -107,7 +107,7 @@ export default function About() {
             { num: '12+',   label: 'Churches Planted' },
             { num: '5+',    label: 'States Reached' },
           ].map((s, i) => (
-            <div key={i} className="stat-item">
+            <div key={i} className={`stat-item reveal-left reveal-delay-${i + 1}`}>
               <span className="stat-num">{s.num}</span>
               <span className="stat-label">{s.label}</span>
             </div>
@@ -116,13 +116,13 @@ export default function About() {
 
         {/* ── MISSION & VISION ───────────────────────────────────── */}
         <section className="mv-section">
-          <div className="mv-card">
+          <div className="mv-card reveal-zoom">
             <span className="mv-icon">🎯</span>
             <span className="section-tag">PURPOSE</span>
             <h3>Our Mission</h3>
             <p>To preach the undiluted gospel of Jesus Christ, minister healing and deliverance by the power of the Holy Spirit, and establish self-sustaining local assemblies that multiply and reach the nations.</p>
           </div>
-          <div className="mv-card mv-card-gold">
+          <div className="mv-card mv-card-gold reveal-zoom">
             <span className="mv-icon">🌍</span>
             <span className="section-tag">DIRECTION</span>
             <h3>Our Vision</h3>
@@ -131,7 +131,7 @@ export default function About() {
         </section>
 
         {/* ── CORE VALUES ────────────────────────────────────────── */}
-        <section className="values-section">
+        <section className="values-section reveal">
           <div className="values-header text-center">
             <span className="section-tag">WHAT DRIVES US</span>
             <h2>Our Core Values</h2>
@@ -149,7 +149,7 @@ export default function About() {
         </section>
 
         {/* ── TIMELINE ────────────────────────────────────────────── */}
-        <section className="timeline-section">
+        <section className="timeline-section reveal">
           <div className="text-center" style={{ marginBottom: '3rem' }}>
             <span className="section-tag">THE JOURNEY</span>
             <h2 className="section-title">Ministry Milestones</h2>
@@ -171,7 +171,7 @@ export default function About() {
         </section>
 
         {/* ── STATEMENT OF FAITH ──────────────────────────────────── */}
-        <section className="faith-section">
+        <section className="faith-section reveal">
           <div className="faith-header text-center">
             <span className="section-tag">THEOLOGY</span>
             <h2>What We Believe</h2>
@@ -206,7 +206,7 @@ export default function About() {
 
         {/* ── PROJECTS DIRECTORY ──────────────────────────────────── */}
         {projects && projects.length > 0 && (
-          <section className="projects-section">
+          <section className="projects-section reveal">
             <div className="text-center" style={{ marginBottom: '2.5rem' }}>
               <span className="section-tag">ON THE GROUND</span>
               <h2 className="section-title">Ministry Projects</h2>
@@ -239,7 +239,7 @@ export default function About() {
 
         {/* ── EVENTS CALENDAR ─────────────────────────────────────── */}
         {events && events.length > 0 && (
-          <section className="events-section">
+          <section className="events-section reveal">
             <div className="text-center" style={{ marginBottom: '2.5rem' }}>
               <span className="section-tag">COMING UP</span>
               <h2 className="section-title">Events Calendar</h2>
@@ -264,7 +264,7 @@ export default function About() {
         )}
 
         {/* ── BOTTOM CTA ──────────────────────────────────────────── */}
-        <section className="about-cta-banner">
+        <section className="about-cta-banner reveal">
           <div className="cta-banner-inner text-center">
             <span className="section-tag" style={{ color: 'rgba(255,255,255,0.7)' }}>JOIN THE MISSION</span>
             <h2 style={{ color: '#fff' }}>How Can You Pray for You?</h2>

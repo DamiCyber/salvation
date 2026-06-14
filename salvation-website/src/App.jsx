@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppProvider } from './context/AppContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import useScrollReveal from './hooks/useScrollReveal';
 
 // Pages
 import Home from './pages/Home';
@@ -23,13 +24,18 @@ import FAQ from './pages/FAQ';
 
 function App() {
   const [currentHash, setCurrentHash] = useState(window.location.hash || '#home');
+  const [pageKey, setPageKey] = useState(0);
+
+  // Drive scroll-reveal whenever the page changes
+  useScrollReveal(pageKey);
 
   // Monitor url hashes for routing
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash || '#home';
       setCurrentHash(hash);
-      window.scrollTo(0, 0); // Scroll to top on page transition
+      setPageKey(k => k + 1); // bump key → re-run scroll reveal
+      window.scrollTo(0, 0);
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -92,7 +98,9 @@ function App() {
       <div className="app-container">
         <Navbar currentHash={currentHash} />
         <main className="main-content">
-          {renderPage()}
+          <div key={pageKey} className="page-enter">
+            {renderPage()}
+          </div>
         </main>
         <Footer />
       </div>
