@@ -1,48 +1,51 @@
 /**
  * mediaServer.js
- * Node Media Server — receives RTMP from OBS and transcodes to HLS
- * so the browser can play the stream natively.
+ * Node Media Server — receives RTMP from OBS and serves HLS.
  *
  * OBS Settings:
- *   Service:  Custom
- *   Server:   rtmp://localhost/live
- *   Stream Key: salvation   (or any key you choose)
+ *   Service:    Custom
+ *   Server:     rtmp://localhost/live
+ *   Stream Key: salvation
  *
- * The HLS stream will be available at:
- *   http://localhost:8000/live/salvation/index.m3u8
+ * HLS stream URL: http://localhost:8000/live/salvation/index.m3u8
  *
- * IMPORTANT: ffmpeg must be installed on this machine.
- *   Windows: https://www.gyan.dev/ffmpeg/builds/ → add to PATH
- *   Or:      winget install ffmpeg
+ * ffmpeg path: auto-detected from winget install location
  */
 const NodeMediaServer = require('node-media-server');
 const path            = require('path');
 const fs              = require('fs');
 
-// Directory where HLS segments will be written
-const HLS_DIR = path.join(__dirname, 'media');
+const HLS_DIR    = path.join(__dirname, 'media');
+const FFMPEG_BIN = process.env.FFMPEG_PATH ||
+  'C:\\Users\\user\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin\\ffmpeg.exe';
+
 if (!fs.existsSync(HLS_DIR)) fs.mkdirSync(HLS_DIR, { recursive: true });
 
 const config = {
+  logType: 1, // 0=nothing, 1=errors, 2=debug
   rtmp: {
-    port:       1935,
-    chunk_size: 60000,
-    gop_cache:  true,
-    ping:       30,
-    ping_timeout: 60,
+    port:         1935,
+    chunk_size:   60000,
+    gop_cache:    true,
+    ping:         60,
+    ping_timeout: 30,
   },
   http: {
-    port:        8000,
-    mediaroot:   HLS_DIR,
+    port:         8000,
+    mediaroot:    HLS_DIR,
     allow_origin: '*',
   },
   trans: {
-    ffmpeg: process.env.FFMPEG_PATH || 'ffmpeg', // must be in PATH or set FFMPEG_PATH
+    ffmpeg: FFMPEG_BIN,
     tasks: [
       {
-        app:  'live',
-        hls:  true,
-        hlsFlags: '[hls_time=2:hls_list_size=3:hls_flags=delete_segments]',
+        app:      'live',
+        hls:      true,
+        // keep=true means HLS segments stay alive even when no RTMP viewer is watching
+        hlsFlags: '[hls_time=2:hls_list_size=6:hls_flags=delete_segments]',
+        hlsKeep:  true,
+        vc:       'copy',
+        ac:       'copy',
       },
     ],
   },

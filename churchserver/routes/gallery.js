@@ -5,7 +5,7 @@ const GalleryItem = require('../Gallery');
 const adminAuth   = require('../adminAuth');
 const { uploadSingle } = require('../upload');
 
-const SERVER_BASE = process.env.SERVER_URL || 'http://localhost:5000';
+const SERVER_BASE = process.env.SERVER_URL || '';
 
 // ─── Public: list gallery items ──────────────────────────────────────────────
 router.get('/', async (req, res) => {

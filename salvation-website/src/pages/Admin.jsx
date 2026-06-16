@@ -331,12 +331,35 @@ export default function Admin() {
               </div>
               <div className="form-group">
                 <label className="form-label">Embed URL</label>
-                <input type="text" value={streamUrl} onChange={e => setStreamUrl(e.target.value)} className="form-input" required placeholder="https://www.youtube.com/embed/VIDEO_ID  or  http://localhost:8000/live/salvation/index.m3u8" />
+                <input type="text" value={streamUrl} onChange={e => setStreamUrl(e.target.value)} className="form-input" required placeholder="https://www.facebook.com/plugins/video.php?href=..." />
+                <small style={{ color: 'var(--danger)', display: 'block', marginTop: '0.25rem', fontWeight: 600 }}>
+                  ⚠️ Do NOT paste your RTMP stream key here. This field needs an <strong>https://</strong> embed URL only.
+                </small>
                 <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
-                  YouTube: use <code>/embed/VIDEO_ID</code> format. &nbsp;|&nbsp; OBS: use the HLS URL from the setup guide →
+                  Facebook: once live, click 3 dots on the post → Embed → copy the <code>src</code> URL from the iframe.
                 </small>
               </div>
               <button type="submit" className="btn btn-primary">Save Stream Settings</button>
+              {streamState.isLive && streamState.streamUrl === 'zego' && (
+                <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(166,28,46,0.06)', border: '1px solid rgba(166,28,46,0.25)', borderRadius: 8 }}>
+                  <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Stream is set to ZegoCloud. Click below to open the host broadcaster — your camera will go live immediately.
+                  </p>
+                  <a
+                    href="http://localhost:5173/#live-tv"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-crimson"
+                    style={{ display: 'flex', justifyContent: 'center', width: '100%' }}
+                    onClick={() => {
+                      // Store host flag in sessionStorage so the LiveTv page picks it up
+                      sessionStorage.setItem('zegoHost', '1');
+                    }}
+                  >
+                    🔴 Open Broadcast Window
+                  </a>
+                </div>
+              )}
             </form>
           </div>
           <div className="card">
@@ -356,27 +379,20 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* OBS Setup Guide */}
+            {/* Streaming Setup Guide */}
             <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'rgba(26,58,107,0.04)', border: '1px solid var(--glass-border)', borderRadius: 8 }}>
               <p style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary-gold)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 0.75rem' }}>
-                📡 OBS Streaming Setup
+                📡 Facebook Live Setup
               </p>
-              <ol style={{ paddingLeft: '1.1rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              <ol style={{ paddingLeft: '1.1rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 {[
-                  <>In OBS → <strong>Settings → Stream</strong></>,
-                  <>Service: <strong>Custom</strong></>,
-                  <>Server: <code style={{ background: 'var(--bg-800)', padding: '0.1rem 0.4rem', borderRadius: 3, fontSize: '0.78rem', color: 'var(--primary-blue)' }}>rtmp://localhost/live</code></>,
-                  <>Stream Key: <code style={{ background: 'var(--bg-800)', padding: '0.1rem 0.4rem', borderRadius: 3, fontSize: '0.78rem', color: 'var(--primary-blue)' }}>salvation</code></>,
-                  <>Click <strong>Start Streaming</strong> in OBS</>,
-                  <>Set Embed URL above to:<br/><code style={{ background: 'var(--bg-800)', padding: '0.15rem 0.4rem', borderRadius: 3, fontSize: '0.75rem', color: 'var(--primary-blue)', wordBreak: 'break-all' }}>http://localhost:8000/live/salvation/index.m3u8</code></>,
-                  <>Toggle <strong>Broadcast is LIVE NOW</strong> → Save</>,
+                  <>Stream to Facebook using your software</>,
+                  <>Once live, copy the video URL from your Facebook Page</>,
+                  <>Paste it in the Embed URL field above → Toggle Live ON → Save</>,
                 ].map((step, i) => (
                   <li key={i} style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{step}</li>
                 ))}
               </ol>
-              <p style={{ marginTop: '0.75rem', marginBottom: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                ⚠️ Requires <strong>ffmpeg</strong> installed on this machine.
-              </p>
             </div>
           </div>
         </div>

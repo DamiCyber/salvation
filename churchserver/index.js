@@ -78,6 +78,7 @@ app.use('/api/contact',     require('./routes/contact'));
 app.use('/api/volunteers',  require('./routes/volunteers'));
 app.use('/api/gallery',     require('./routes/gallery'));
 app.use('/api/paystack',    require('./routes/paystack'));
+app.use('/api/download',    require('./routes/download'));
 
 // ─── Health Check ─────────────────────────────────────────────
 app.get('/', (_req, res) => res.json({ status: 'Salvation Series API running ✅' }));
