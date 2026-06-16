@@ -16,6 +16,7 @@ export default function Navbar({ currentHash }) {
     { name: 'Bible School', hash: '#bible-school' },
     { name: 'Prayer Programs', hash: '#prayer-programs' },
     { name: 'Counseling', hash: '#counseling' },
+    { name: 'Books & Publications', hash: '#publications' },
     { name: 'FAQ', hash: '#faq' },
     { name: 'Team', hash: '#team' },
   ];
@@ -202,6 +203,7 @@ export default function Navbar({ currentHash }) {
               { label: 'Bible School',     hash: '#bible-school',    icon: 'menu_book' },
               { label: 'Prayer Programs',  hash: '#prayer-programs', icon: 'volunteer_activism' },
               { label: 'Counseling',       hash: '#counseling',      icon: 'support_agent' },
+              { label: 'Books',            hash: '#publications',    icon: 'auto_stories' },
               { label: 'Team',             hash: '#team',            icon: 'groups' },
               { label: 'FAQ',              hash: '#faq',             icon: 'help' },
             ].map(link => (
